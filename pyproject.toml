@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uvc-ptz-camera-mcp"
+version = "0.1.0"
+description = "MCP server for USB (UVC) pan/tilt/zoom cameras: aim, zoom, sweep and capture, with every move verified against the picture."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Abhijat Saxena"}]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "camera",
+    "ptz",
+    "pan-tilt-zoom",
+    "uvc",
+    "usb-camera",
+    "webcam",
+    "gimbal",
+    "video-capture",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video :: Capture",
+    "Topic :: Multimedia :: Video :: Display",
+]
+dependencies = [
+    "mcp>=2.2.0,<3",
+]
+
+[project.optional-dependencies]
+# The Windows DirectShow control path. Kept optional so the package installs and the
+# simulator/testing path runs anywhere.
+dshow = ["comtypes>=1.4", "pygrabber>=0.2"]
+# Frame capture and comparison (snapshots, verification). Also optional: without it the
+# verification tools report that they cannot confirm, rather than pretending to.
+capture = ["numpy>=1.24"]
+
+[project.urls]
+Homepage = "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp"
+Issues = "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp/issues"
+
+[project.scripts]
+uvc-ptz-mcp = "uvc_ptz_mcp.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["uvc_ptz_mcp*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["C", "D", "E", "F", "I", "N", "PL", "Q", "UP", "W"]
+ignore = [
+    "D203",     # conflicts with D211
+    "D213",     # summary on the first line is fine
+    "PLR0913",  # arguments are explicit here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D103", "PLR2004"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

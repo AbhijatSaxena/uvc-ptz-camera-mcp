@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.AbhijatSaxena/uvc-ptz-camera-mcp",
+  "title": "UVC PTZ Camera",
+  "description": "Control a USB (UVC) pan/tilt/zoom camera: aim, nudge, sweep, zoom, and capture, with every move confirmed from the picture.",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp",
+  "repository": {
+    "url": "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "uvc-ptz-camera-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "UVC_PTZ_STATE_DIR",
+          "description": "Where to store what has been learned about each camera (its recorded directions and verification threshold). Defaults to ~/.uvc-ptz-camera-mcp. Holds angles, never credentials.",
+          "isRequired": false
+        },
+        {
+          "name": "UVC_PTZ_SIM_SOURCE",
+          "description": "Path to an image to use as the simulator's panorama, instead of the synthesised one. Useful for making a simulated run look like the real scene.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+# Virtual environments: the local checkouts, and the bundle's own
+.venv/
+.venv*/
+mcpb/.venv/
+mcpb/uv.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Scratch: frames captured while testing, and any generated panorama source
+*.png
+!assets/*.png

@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"   # the floor we claim: the linter's target must match it
+      - run: python -m pip install --quiet ruff
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor version runs for real. A local venv on a newer interpreter cannot catch a
+        # rule that autofixes into 3.11-only syntax, and this package claims 3.10.
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --quiet --upgrade pip
+      - run: python -m pip install --quiet -e . numpy pytest pytest-asyncio
+      - run: python -m pytest -q
+
+  versions:
+    # Package metadata, the version constant inside the code, the registry manifest and the
+    # bundle manifest each carry a copy of the version. The constant is the one that drifts
+    # silently: nothing reads it until a host asks, so a server reporting the previous release
+    # while every manifest says the new one is a lie about which build is running.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: every copy of the version must agree
+        run: python scripts/check_versions.py

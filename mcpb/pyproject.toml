@@ -1,0 +1,9 @@
+[project]
+name = "uvc-ptz-camera-mcp-bundle"
+version = "0.1.0"
+description = "Desktop bundle wrapper for the uvc-ptz-camera-mcp server."
+requires-python = ">=3.10"
+
+# The bundle carries no server code on purpose: it declares the published package and lets the
+# host resolve it, so the bundle cannot drift from a release and stays small.
+dependencies = ["uvc-ptz-camera-mcp==0.1.0", "mcp>=2.2.0,<3", "numpy>=1.24"]

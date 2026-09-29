@@ -1,0 +1,5 @@
+# Normalise line endings on commit: this is developed on Windows and tested on Linux CI, and a
+# file that only passes on one of the two is a file that lies on the other.
+* text=auto eol=lf
+*.png binary
+*.whl binary
