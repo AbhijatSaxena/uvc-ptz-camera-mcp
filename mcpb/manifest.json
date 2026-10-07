@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "uvc-ptz-camera-mcp",
   "display_name": "UVC PTZ Camera",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Control a USB (UVC) pan/tilt/zoom camera, with every move confirmed from the picture.",
   "long_description": "An MCP server for USB (UVC) pan/tilt/zoom cameras: aim one, nudge it, sweep it smoothly, zoom it, and look through it.\n\nEvery move is confirmed by comparing the camera's picture before and after, because this class of camera reports positions it never moved to. On the reference device a command to pan to 180 read back 180 while the video proved nothing had moved, and a 32-second run read back 0 on every sample while the frame demonstrably changed. So the device's own value is returned as a hint and never trusted, and 'moved' is decided from the picture.\n\nNo account, no cloud, no vendor SDK. If no camera is attached the server still starts and lists its tools, and says so: results are labelled simulated, with the reason. The simulator is calibrated from real measurements (command latency, per-axis settle times, silently dropped writes, a read-back that echoes unapplied requests) so the whole server can be tried without hardware.",
   "author": {
@@ -11,20 +11,61 @@
   },
   "icon": "icon.png",
   "server": {
-    "type": "uv",
+    "type": "python",
     "entry_point": "src/server.py",
     "mcp_config": {
       "command": "uv",
-      "args": ["run", "--directory", "${__dirname}", "src/server.py"],
-      "env": {}
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "src/server.py"
+      ],
+      "env": {
+        "UVC_PTZ_DEVICE": "${user_config.device}",
+        "UVC_PTZ_BACKEND": "${user_config.backend}",
+        "UVC_PTZ_STATE_DIR": "${user_config.state_dir}"
+      }
+    }
+  },
+  "user_config": {
+    "device": {
+      "type": "string",
+      "title": "Camera name",
+      "description": "Which camera to drive when the machine has more than one: any part of a name that `uvc-ptz-mcp --list-devices` prints. Leave empty to use the only camera. Not a credential.",
+      "required": false
+    },
+    "backend": {
+      "type": "string",
+      "title": "Backend",
+      "description": "Leave empty for auto, which prefers a real camera and falls back to the simulator. Use 'simulator' to work with no hardware attached.",
+      "required": false
+    },
+    "state_dir": {
+      "type": "string",
+      "title": "State directory",
+      "description": "Where to keep what has been learned about each camera. Leave empty for ~/.uvc-ptz-camera-mcp.",
+      "required": false
     }
   },
   "compatibility": {
-    "platforms": ["win32", "darwin", "linux"],
+    "platforms": [
+      "win32",
+      "darwin",
+      "linux"
+    ],
     "runtimes": {
       "python": ">=3.10"
     }
   },
-  "keywords": ["camera", "ptz", "pan tilt", "uvc", "usb camera", "webcam", "gimbal"],
+  "keywords": [
+    "camera",
+    "ptz",
+    "pan tilt",
+    "uvc",
+    "usb camera",
+    "webcam",
+    "gimbal"
+  ],
   "license": "MIT"
 }

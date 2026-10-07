@@ -29,7 +29,9 @@ get this snippet with the right interpreter already filled in, and `uvc-ptz-mcp 
 to see the camera names available for `--device NAME`.
 
 Useful flags: `--device NAME` (substring match, for a machine with several cameras),
-`--backend dshow|simulator|auto`.
+`--backend dshow|simulator|auto`. Both also read from the environment (`UVC_PTZ_DEVICE`,
+`UVC_PTZ_BACKEND`, `UVC_PTZ_STATE_DIR`), which is how the desktop bundle configures them; the flag
+wins, and an empty value means "not set".
 
 ## 3. Verify the install
 

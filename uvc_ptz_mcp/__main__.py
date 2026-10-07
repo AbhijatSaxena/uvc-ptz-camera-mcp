@@ -25,6 +25,44 @@ from .server import configure_logging, main_server
 
 BACKENDS = ("auto", "dshow", "simulator")
 
+# Hosts configure a local server through the environment more often than through flags, because
+# the environment survives a host restart without editing the host's config again. Both are
+# supported, and the flag wins when both are present.
+DEVICE_ENV = "UVC_PTZ_DEVICE"
+BACKEND_ENV = "UVC_PTZ_BACKEND"
+
+
+def env_setting(name: str) -> str | None:
+    """Read a configuration variable, treating empty as unset.
+
+    A host that maps an unset option into the environment writes an empty string rather than
+    nothing at all, so "" has to mean "not configured". Otherwise `UVC_PTZ_BACKEND=""` would be
+    an invalid choice and the server would refuse to start on a host that simply left the option
+    blank -- the most common way this breaks.
+    """
+    value = os.environ.get(name, "").strip()
+    return value or None
+
+
+def resolve_backend(flag: str | None) -> str:
+    """Decide the backend: the flag, else the environment, else auto."""
+    candidate = flag or env_setting(BACKEND_ENV)
+    if candidate is None:
+        return "auto"
+    if candidate not in BACKENDS:
+        print(
+            f"ignoring {BACKEND_ENV}={candidate!r}: expected one of {', '.join(BACKENDS)}; "
+            f"using auto",
+            file=sys.stderr,
+        )
+        return "auto"
+    return candidate
+
+
+def resolve_device(flag: str | None) -> str | None:
+    """Decide the device hint: the flag, else the environment, else none."""
+    return flag or env_setting(DEVICE_ENV)
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line surface."""
@@ -39,14 +77,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--backend",
         choices=BACKENDS,
-        default="auto",
-        help="auto (default) prefers a real camera and falls back to the simulator, "
-        "dshow forces the Windows DirectShow path, simulator never touches hardware",
+        default=None,
+        help=f"auto (default) prefers a real camera and falls back to the simulator, "
+        f"dshow forces the Windows DirectShow path, simulator never touches hardware. "
+        f"Overrides ${BACKEND_ENV}.",
     )
     parser.add_argument(
         "--device",
         default=None,
-        help="substring of the camera's name, e.g. osmo or 'cam link'. See --list-devices.",
+        help="substring of the camera's name, e.g. osmo or 'cam link'. See --list-devices. "
+        f"Overrides ${DEVICE_ENV}.",
     )
     parser.add_argument(
         "--state-dir",
@@ -67,15 +107,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def host_config(args: argparse.Namespace) -> dict:
-    """Return the host snippet, reflecting the flags the user actually passed."""
+def host_config(backend: str, device: str | None, state_dir: str | None) -> dict:
+    """Return the host snippet for the configuration that will actually be used."""
     forwarded: list[str] = []
-    if args.backend != "auto":
-        forwarded += ["--backend", args.backend]
-    if args.device:
-        forwarded += ["--device", args.device]
-    if args.state_dir:
-        forwarded += ["--state-dir", args.state_dir]
+    if backend != "auto":
+        forwarded += ["--backend", backend]
+    if device:
+        forwarded += ["--device", device]
+    if state_dir:
+        forwarded += ["--state-dir", state_dir]
     return {
         "mcpServers": {
             "uvc-ptz-camera-mcp": {
@@ -134,18 +174,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"uvc-ptz-camera-mcp {__version__}")
         return 0
 
+    backend = resolve_backend(args.backend)
+    device = resolve_device(args.device)
+
     if args.state_dir:
         os.environ[STATE_DIR_ENV] = args.state_dir
 
     if args.list_devices:
-        return list_devices(args.device)
+        return list_devices(device)
 
     if args.print_config:
-        print(json.dumps(host_config(args), indent=2))
+        print(json.dumps(host_config(backend, device, args.state_dir), indent=2))
         return 0
 
     configure_logging()
-    main_server(args.backend, args.device)
+    main_server(backend, device)
     return 0
 
 

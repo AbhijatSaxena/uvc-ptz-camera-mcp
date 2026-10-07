@@ -97,9 +97,12 @@ configuration, because there is nothing to authenticate:
 ```
 
 Add `"--device", "Osmo"` (any substring of the name `--list-devices` prints) when the machine has
-more than one camera, and `"--backend", "simulator"` to work with none. Claude Desktop also accepts
-the `.mcpb` bundle attached to each [release](https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp/releases)
-as a one-click install.
+more than one camera, and `"--backend", "simulator"` to work with none. Both can also be set in the
+environment instead of the args — `UVC_PTZ_DEVICE`, `UVC_PTZ_BACKEND` and `UVC_PTZ_STATE_DIR` — which
+is what the Claude Desktop bundle uses, and which survives a host restart without editing its config
+again. A flag wins over the environment, and an empty value means "not set" (a host that leaves an
+option blank writes `""`, not nothing). Claude Desktop also accepts the `.mcpb` bundle attached to
+each [release](https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp/releases) as a one-click install.
 
 ## Modes, and how you can tell which one you are in
 
