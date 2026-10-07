@@ -80,6 +80,27 @@ uvc-ptz-mcp --list-devices        # what to pass to --device
 uvc-ptz-mcp --backend simulator   # try it with no camera attached
 ```
 
+### Where to put it
+
+Claude Desktop, Cursor, VS Code and friends all take the same shape — this is the whole
+configuration, because there is nothing to authenticate:
+
+```json
+{
+  "mcpServers": {
+    "ptz-camera": {
+      "command": "uvx",
+      "args": ["uvc-ptz-camera-mcp"]
+    }
+  }
+}
+```
+
+Add `"--device", "Osmo"` (any substring of the name `--list-devices` prints) when the machine has
+more than one camera, and `"--backend", "simulator"` to work with none. Claude Desktop also accepts
+the `.mcpb` bundle attached to each [release](https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp/releases)
+as a one-click install.
+
 ## Modes, and how you can tell which one you are in
 
 | Backend | What it is |
