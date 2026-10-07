@@ -478,6 +478,55 @@ def build_server(session: Session) -> MCPServer:  # noqa: C901, PLR0915
         return {"label": label, "target": pose, "moved": reports}
 
     @server.tool()
+    async def plan_shot(steps: list[dict]) -> dict:
+        """Compile a shot and report what it would do, without moving the camera.
+
+        Takes exactly the step list `run_shot` takes: each step is an object like
+        {"axis": "pan", "to": 60, "seconds": 2.5, "ease": "in_out"}, optionally with
+        {"hold": 1.0} to pause after it. Every step is validated against the camera's advertised
+        ranges and clamped exactly as it would be at execution time, so an impossible or
+        out-of-range shot is refused here, before anything moves.
+
+        Use this to compose a shot. It returns the per-step schedule (where each axis starts, the
+        value it was clamped to, how far it travels, how many ticks it costs), the per-axis
+        envelope, the total duration, and the axes with their ranges so the next attempt can be
+        written against the real limits. Nothing is written to the camera and no frame is captured,
+        so it is safe to call as often as you like while deciding.
+
+        The `from` values come from the device's own position report, which this server treats as a
+        hint rather than a fact. `run_shot` recompiles from the same hint when it runs, so a plan
+        and its execution agree unless the camera moved in between.
+        """
+        if not isinstance(steps, list) or not steps:
+            raise ToolError("steps must be a non-empty list of step objects")
+        specs = session.specs
+        if not specs:
+            raise ToolError("no camera axes are available, so a shot cannot be compiled")
+
+        pose_hints = {}
+        for axis in specs:
+            reported = await session.reported(axis)
+            pose_hints[axis] = specs[axis].default if reported is None else int(reported)
+
+        try:
+            shot = compile_shot(steps, specs, pose_hints)
+        except ValueError as error:
+            raise ToolError(str(error)) from None
+
+        return {
+            "plan": shot.to_dict(),
+            "envelope": shot.envelope(),
+            "axes": [spec.to_dict() for spec in specs.values()],
+            "totals": {
+                "duration_seconds": round(shot.duration, 3),
+                "ticks": len(shot.ticks),
+                "steps": len(shot.compiled),
+            },
+            "moved": False,
+            "note": "nothing was moved; pass the same steps to run_shot to execute this",
+        }
+
+    @server.tool()
     async def run_shot(steps: list[dict]) -> dict:
         """Execute a multi-step camera move, verifying after every waypoint.
 

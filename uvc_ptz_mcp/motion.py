@@ -82,6 +82,42 @@ class Tick:
     targets: dict[Axis, int]
 
 
+@dataclass(frozen=True)
+class CompiledStep:
+    """One step as the compiler understood it: validated, clamped, and costed.
+
+    Kept so a caller can ask what a shot *would* do before anything moves -- which is the point of
+    separating planning from execution. Without it, the only way to find out what a step list does
+    is to run it and watch.
+    """
+
+    index: int
+    axis: Axis
+    origin: int
+    target: int
+    requested: int
+    seconds: float
+    ease: str
+    hold: float
+    ticks: int
+
+    def to_dict(self) -> dict:
+        """Serialise for a tool result."""
+        return {
+            "step": self.index,
+            "axis": self.axis.value,
+            "from": self.origin,
+            "to": self.target,
+            "travel": self.target - self.origin,
+            "seconds": round(self.seconds, 3),
+            "ease": self.ease,
+            "hold": round(self.hold, 3),
+            "ticks": self.ticks,
+            "clamped": self.target != self.requested,
+            "requested": self.requested,
+        }
+
+
 @dataclass
 class Shot:
     """A compiled shot, ready to execute."""
@@ -95,6 +131,8 @@ class Shot:
     # every waypoint rather than only at the end of the shot.
     step_ends: list[float] = field(default_factory=list)
     step_labels: list[str] = field(default_factory=list)
+    # The steps themselves, with the origin each one started from and the value it was clamped to.
+    compiled: list[CompiledStep] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Serialise the plan (not every tick) for a tool result."""
@@ -103,9 +141,33 @@ class Shot:
             "rate_hz": self.rate_hz,
             "ticks": len(self.ticks),
             "steps": self.steps,
-            "step_labels": self.step_labels,
+            "schedule": [step.to_dict() for step in self.compiled],
             "warnings": self.warnings,
         }
+
+    def envelope(self) -> dict[str, dict]:
+        """Per-axis summary: where it starts, the extremes it reaches, and where it ends."""
+        summary: dict[str, dict] = {}
+        for step in self.compiled:
+            entry = summary.setdefault(
+                step.axis.value,
+                {
+                    "starts_at": step.origin,
+                    "ends_at": step.target,
+                    "lowest": step.origin,
+                    "highest": step.origin,
+                    "steps": 0,
+                    "seconds": 0.0,
+                },
+            )
+            entry["ends_at"] = step.target
+            entry["lowest"] = min(entry["lowest"], step.origin, step.target)
+            entry["highest"] = max(entry["highest"], step.origin, step.target)
+            entry["steps"] += 1
+            entry["seconds"] = round(entry["seconds"] + step.seconds + step.hold, 3)
+        for entry in summary.values():
+            entry["travel"] = entry["ends_at"] - entry["starts_at"]
+        return summary
 
     def ticks_until(self, limit: float) -> list[Tick]:
         """Ticks up to and including time `limit`."""
@@ -194,11 +256,25 @@ def compile_shot(
         shot.warnings.extend(warnings)
 
         origin = current.get(axis, spec.default)
-        shot.ticks.extend(_step_ticks(spec, axis, origin, target, step, rate_hz, timeline))
+        step_ticks = _step_ticks(spec, axis, origin, target, step, rate_hz, timeline)
+        shot.ticks.extend(step_ticks)
         if len(shot.ticks) > MAX_TICKS:
             raise ValueError(
                 f"shot would need more than {MAX_TICKS} ticks; shorten it or lower rate_hz"
             )
+        shot.compiled.append(
+            CompiledStep(
+                index=index,
+                axis=axis,
+                origin=origin,
+                target=target,
+                requested=int(round(step.to)),
+                seconds=step.seconds,
+                ease=step.ease,
+                hold=step.hold,
+                ticks=len(step_ticks),
+            )
+        )
 
         current[axis] = target
         timeline += step.seconds

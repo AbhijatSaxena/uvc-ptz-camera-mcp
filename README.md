@@ -22,10 +22,16 @@ look                one frame, returned as an image
 aim_learn           remember "this direction is the desk"
 aim_list            what has been recorded for this camera
 go_to               point at a recorded direction
-run_shot            a multi-step move, verified after every waypoint
+plan_shot           compile a multi-step shot and report what it would do, moving nothing
+run_shot            execute a multi-step move, verified after every waypoint
 mark_view           store the current picture under a label
 check_view          has the picture changed since that label?
 ```
+
+Composing a shot is `plan_shot` then `run_shot`. Planning compiles exactly the steps the executor
+will compile, reports the per-step schedule, how far each axis travels and how long it takes, and
+touches nothing — so an agent can iterate on "a panorama, then zoom in on me" against the camera's
+real ranges *before* anything moves, instead of finding out afterwards.
 
 ## Why this exists
 

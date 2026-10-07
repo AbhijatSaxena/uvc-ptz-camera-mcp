@@ -20,6 +20,8 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from uvc_ptz_mcp.calibration import Calibration
+from uvc_ptz_mcp.camera import REFERENCE_SPECS
+from uvc_ptz_mcp.motion import compile_shot
 from uvc_ptz_mcp.server import Session, build_server
 from uvc_ptz_mcp.simulator import SimulatorBackend
 
@@ -299,3 +301,85 @@ async def test_a_camera_that_cannot_be_read_is_a_tool_error_not_a_crash(monkeypa
     message = str(raised.value)
     assert "cannot read a frame" in message, "the tool must name what failed"
     assert "ffmpeg" in message, "and the underlying reason must survive"
+
+
+# -- planning, before anything moves ---------------------------------------------------
+
+
+PLAN_STEPS = [
+    {"axis": "pan", "to": 60, "seconds": 2.0},
+    {"axis": "tilt", "to": 20, "seconds": 1.0, "hold": 0.5},
+]
+
+
+async def test_plan_shot_reports_the_schedule_without_touching_the_camera(monkeypatch, tmp_path):
+    """The point of planning: find out what a shot does before it does it."""
+    monkeypatch.setenv("UVC_PTZ_STATE_DIR", str(tmp_path))
+    backend = RecordingSimulator(speed=SPEED, drop_probability=0.0)
+    backend.open()
+    server = build_server(make_session(backend, tmp_path))
+
+    plan = await call(server, "plan_shot", {"steps": PLAN_STEPS})
+
+    assert plan["moved"] is False
+    assert backend.actions == 0, "planning must not write to the camera"
+    assert backend.threads == [], "planning must not capture frames either"
+
+    schedule = plan["plan"]["schedule"]
+    assert [step["axis"] for step in schedule] == ["pan", "tilt"]
+    assert (schedule[0]["from"], schedule[0]["to"], schedule[0]["travel"]) == (0, 60, 60)
+    assert schedule[0]["ticks"] == int(round(2.0 * plan["plan"]["rate_hz"]))
+    assert schedule[1]["hold"] == 0.5
+    assert plan["plan"]["duration_seconds"] == pytest.approx(3.5, abs=0.01)
+
+    assert plan["envelope"]["pan"]["travel"] == 60
+    assert plan["envelope"]["pan"]["highest"] == 60
+    assert plan["envelope"]["tilt"]["ends_at"] == 20
+    assert [axis["axis"] for axis in plan["axes"]], (
+        "the ranges are reported so steps can be written"
+    )
+
+
+async def test_plan_shot_says_when_it_had_to_clamp(monkeypatch, tmp_path):
+    monkeypatch.setenv("UVC_PTZ_STATE_DIR", str(tmp_path))
+    backend = RecordingSimulator(speed=SPEED, drop_probability=0.0)
+    backend.open()
+    server = build_server(make_session(backend, tmp_path))
+
+    plan = await call(server, "plan_shot", {"steps": [{"axis": "pan", "to": 9000, "seconds": 1.0}]})
+
+    step = plan["plan"]["schedule"][0]
+    assert step["requested"] == 9000
+    assert step["to"] == 215, "clamped to what the camera advertises"
+    assert step["clamped"] is True
+    assert any("clamped" in warning for warning in plan["plan"]["warnings"])
+    assert backend.actions == 0
+
+
+async def test_plan_shot_refuses_an_impossible_plan_before_anything_moves(monkeypatch, tmp_path):
+    monkeypatch.setenv("UVC_PTZ_STATE_DIR", str(tmp_path))
+    backend = RecordingSimulator(speed=SPEED, drop_probability=0.0)
+    backend.open()
+    server = build_server(make_session(backend, tmp_path))
+
+    with pytest.raises(ToolError, match="unknown axis"):
+        await call(server, "plan_shot", {"steps": [{"axis": "spin", "to": 10}]})
+    with pytest.raises(ToolError, match="non-empty"):
+        await call(server, "plan_shot", {"steps": []})
+    assert backend.actions == 0, "a refused plan must not reach the camera"
+
+
+async def test_the_plan_is_the_compilation_the_executor_will_use(monkeypatch, tmp_path):
+    """A preview is only worth having if it matches what running the shot compiles to."""
+    monkeypatch.setenv("UVC_PTZ_STATE_DIR", str(tmp_path))
+    server = build_server(make_session(tmp_path=tmp_path))
+
+    plan = await call(server, "plan_shot", {"steps": PLAN_STEPS})
+
+    # The simulator starts at every axis default, which is what the plan was computed from.
+    hint = {axis: spec.default for axis, spec in REFERENCE_SPECS.items()}
+    direct = compile_shot(PLAN_STEPS, REFERENCE_SPECS, hint)
+
+    assert plan["totals"]["ticks"] == len(direct.ticks)
+    assert plan["totals"]["duration_seconds"] == pytest.approx(direct.duration, abs=1e-3)
+    assert plan["plan"]["schedule"] == [step.to_dict() for step in direct.compiled]
