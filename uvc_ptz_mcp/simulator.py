@@ -133,7 +133,12 @@ class SimulatorBackend:
         self._opened = False
 
     def _load_panorama(self) -> np.ndarray:
-        """Use a real image when one is supplied, otherwise synthesise a deterministic one."""
+        """Use a real image when one is supplied, otherwise synthesise a deterministic one.
+
+        A supplied image is decoded with ffmpeg. If ffmpeg is missing or the file will not decode,
+        the synthetic panorama is used instead: this backend must never require an external tool,
+        because it is the path the test suite and the container image run on.
+        """
         candidate = self._source or (os.environ.get("UVC_PTZ_SIM_SOURCE") or None)
         if candidate and Path(candidate).exists():
             try:

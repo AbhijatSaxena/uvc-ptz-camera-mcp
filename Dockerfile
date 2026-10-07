@@ -11,8 +11,9 @@
 
 FROM python:3.12-slim
 
-# ffmpeg is how frames are captured and encoded: verification compares pictures, so the server
-# needs a decoder even in simulator mode is not true -- but for real use it is required.
+# ffmpeg is needed only to capture frames from a real camera. The image installs it so a device
+# passed through from the host works out of the box; the simulator path uses no external tool at
+# all, which is what lets a directory start this server and read its tool list inside a container.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
  && rm -rf /var/lib/apt/lists/*

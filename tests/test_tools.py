@@ -274,3 +274,28 @@ async def test_tool_error_is_raised_not_returned_in_process(monkeypatch, tmp_pat
     server = build_server(make_session())
     with pytest.raises(ToolError):
         await call(server, "aim", {"axis": "pan", "to": "not-a-number"})
+
+
+class BlindSimulator(SimulatorBackend):
+    """A camera that cannot be read at all.
+
+    This is the state a real one is in on a machine with no ffmpeg: CI caught exactly this, where
+    `look` died with an opaque internal error because PNG encoding went through a missing
+    subprocess. The tool must say what is wrong instead.
+    """
+
+    def frame(self):
+        raise RuntimeError("ffmpeg is required to capture frames from a real camera")
+
+
+async def test_a_camera_that_cannot_be_read_is_a_tool_error_not_a_crash(monkeypatch, tmp_path):
+    monkeypatch.setenv("UVC_PTZ_STATE_DIR", str(tmp_path))
+    backend = BlindSimulator(speed=SPEED, drop_probability=0.0)
+    backend.open()
+    server = build_server(make_session(backend))
+    with pytest.raises(ToolError) as raised:
+        await call(server, "aim", {"axis": "pan", "to": 40})
+    message = str(raised.value)
+    assert "cannot read a frame" in message, "the tool must name what failed"
+    assert "ffmpeg" in message, "and the underlying reason must survive"
+
