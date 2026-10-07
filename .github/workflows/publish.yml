@@ -63,7 +63,19 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: published
+        name: is this version already in the registry?
+        run: |
+          if python scripts/on_registry.py; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: publish the server manifest
+        if: steps.published.outputs.skip == 'false'
         run: |
           curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
             | tar xz mcp-publisher
