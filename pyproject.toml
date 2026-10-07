@@ -35,15 +35,17 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=2.2.0,<3",
+    # numpy is required, not optional: verify.py imports it at module load, and calibration
+    # imports verify, which every entry point imports. Declaring it optional made the console
+    # script fail with ModuleNotFoundError on a clean install of the wheel -- a bug the source
+    # tree cannot show, because the development virtualenv already has numpy in it.
+    "numpy>=1.24",
 ]
 
 [project.optional-dependencies]
 # The Windows DirectShow control path. Kept optional so the package installs and the
 # simulator/testing path runs anywhere.
 dshow = ["comtypes>=1.4", "pygrabber>=0.2"]
-# Frame capture and comparison (snapshots, verification). Also optional: without it the
-# verification tools report that they cannot confirm, rather than pretending to.
-capture = ["numpy>=1.24"]
 
 [project.urls]
 Homepage = "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp"

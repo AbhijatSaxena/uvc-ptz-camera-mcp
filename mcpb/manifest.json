@@ -9,6 +9,7 @@
     "name": "Abhijat Saxena",
     "url": "https://github.com/AbhijatSaxena"
   },
+  "icon": "icon.png",
   "server": {
     "type": "uv",
     "entry_point": "src/server.py",

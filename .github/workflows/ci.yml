@@ -47,3 +47,46 @@ jobs:
           python-version: "3.10"
       - name: every copy of the version must agree
         run: python scripts/check_versions.py
+
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: validate the bundle manifest and its icon
+        run: npx --yes @anthropic-ai/mcpb@latest validate mcpb/manifest.json
+      - name: pack it, and report what is inside
+        run: |
+          npx --yes @anthropic-ai/mcpb@latest pack mcpb bundle.mcpb
+          npx --yes @anthropic-ai/mcpb@latest info bundle.mcpb
+
+  wheel:
+    # Install the built wheel into a fresh environment and start the server from it. The source
+    # tree cannot catch a runtime dependency that is imported unconditionally but declared
+    # optional: the development virtualenv already has the package, so every test passes while a
+    # clean install of the released artifact dies at the first import. That happened here with
+    # numpy, and the console script -- the thing users actually run -- was what broke.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --quiet build
+      - run: python -m build --wheel --outdir dist
+      - run: python scripts/check_wheel.py
+      - name: install into a clean environment and start the server from the installed wheel
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/python -m pip install --quiet --upgrade pip
+          /tmp/clean/bin/python -m pip install --quiet dist/*.whl
+          /tmp/clean/bin/uvc-ptz-mcp --version
+          python scripts/handshake.py /tmp/clean/bin/python
+
+  # There is deliberately no hardware job here. The real backend drives a USB camera over
+  # DirectShow, and a hosted runner has no camera, no Windows host and nothing to point at -- a
+  # "live" job would only ever assert that the simulator works, which the test matrix already
+  # does four times. The hardware path is exercised on a developer machine, and the README says
+  # plainly what that covers and what it does not.

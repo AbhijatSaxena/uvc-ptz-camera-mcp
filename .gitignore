@@ -18,3 +18,9 @@ dist/
 # Scratch: frames captured while testing, and any generated panorama source
 *.png
 !assets/*.png
+!mcpb/icon.png
+
+# Local notes: the publication log and the coding-agent guide. Not part of the published
+# package, and not part of what a visitor to the repository needs.
+SHIPPING-STATUS.md
+CLAUDE.md
