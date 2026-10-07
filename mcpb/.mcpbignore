@@ -8,3 +8,6 @@ __pycache__/
 server/lib/
 server/venv/
 dist/
+# uv resolves this locally. Packaging it would read as a dependency pin, and nothing in the
+# bundle consumes it: the manifest declares what the bundle needs.
+uv.lock

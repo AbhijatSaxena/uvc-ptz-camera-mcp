@@ -2,9 +2,14 @@ name: publish
 
 # Released by pushing a tag: no repository secret is needed, because PyPI trusted publishing and
 # the MCP registry's github-oidc login both accept an OIDC token from a tagged job.
+#
+# workflow_dispatch exists so a release can be re-run *without* rewriting the tag: a manifest fix
+# (the registry enforces a description length, and it is the registry that says so, not any local
+# check) should not require deleting and re-creating a tag that a GitHub release already points to.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 jobs:
   build:

@@ -85,6 +85,19 @@ jobs:
           /tmp/clean/bin/uvc-ptz-mcp --version
           python scripts/handshake.py /tmp/clean/bin/python
 
+  manifest:
+    # The registry enforces rules that no local check knows about -- a description longer than 100
+    # characters is rejected by the registry and by nothing earlier, so it is discovered at publish
+    # time, after a tag exists and a release has been created. Validating here moves that discovery
+    # to the commit that caused it. Needs no credentials: validate only reads.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: validate server.json against the live registry
+        run: |
+          curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher validate
+
   # There is deliberately no hardware job here. The real backend drives a USB camera over
   # DirectShow, and a hosted runner has no camera, no Windows host and nothing to point at -- a
   # "live" job would only ever assert that the simulator works, which the test matrix already
