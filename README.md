@@ -45,7 +45,11 @@ The threshold is not a guess either. It was calibrated on labelled hardware fram
 "same view" pair scored **≤ 0.104** (a 96-second quiet baseline, and two commands the hardware
 ignored), every "view changed" pair scored **≥ 0.624** (a pan, a tilt, a 12× zoom, two aim
 steps). The shipped threshold is the midpoint, **0.364** — a 6× separation — and the test suite
-asserts it still separates them.
+asserts it still separates them. The labelled pairs and the values the metric produced are kept in
+the repository ([`tests/fixtures/`](tests/fixtures/)) so the number can be re-checked rather than
+believed — as measurements, not pictures: no frame or video taken by a camera is committed here,
+and a test fails if one appears. The measurements behind the calibration are in
+[`docs/measurements.md`](docs/measurements.md).
 
 ## What keeps the agent honest
 

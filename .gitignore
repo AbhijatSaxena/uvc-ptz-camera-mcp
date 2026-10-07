@@ -20,6 +20,25 @@ dist/
 !assets/*.png
 !mcpb/icon.png
 
+# Captures must never be committed. Frames from a camera show a room somebody lives in, and a
+# frame pack briefly went public in this repository before it was pulled. The only images here are
+# the generated marks in assets/ and mcpb/icon.png; tests/test_verify.py fails if anything else
+# appears, and these rules stop it being staged in the first place.
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.m4v
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.tif
+*.tiff
+*.heic
+*.npz
+
 # Local notes: the publication log and the coding-agent guide. Not part of the published
 # package, and not part of what a visitor to the repository needs.
 SHIPPING-STATUS.md

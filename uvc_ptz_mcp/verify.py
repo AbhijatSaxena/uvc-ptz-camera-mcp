@@ -10,8 +10,8 @@ reference camera (a DJI Osmo Pocket 4P), where the ground truth was known indepe
 
     highest value across "same view" pairs      0.104   (quiet baseline 96s apart; two
                                                          commanded-but-not-applied moves)
-    lowest value across "view changed" pairs    0.624   (Pan -38, Tilt -30, 12x zoom,
-                                                         Pan 150/215 aim steps)
+    lowest value across "view changed" pairs    0.624   (Pan -38, Tilt -30, 12x zoom, and one
+                                                         unexplained view change)
     chosen threshold                            0.364   (midpoint: a 6x separation)
 
 `DEFAULT_THRESHOLD` is that midpoint. `reference_cases()` returns the recorded pairs, and the
@@ -33,8 +33,9 @@ DEFAULT_THRESHOLD = 0.364
 REFERENCE_HIGHEST_SAME = 0.104
 REFERENCE_LOWEST_CHANGED = 0.624
 
-# Recorded from the reference device. Names are of files that no longer need to exist: these
-# numbers are the calibration record, kept so the threshold can be re-derived and tested.
+# Recorded from the reference device. The frames behind these numbers are in tests/fixtures/;
+# this is the same record in code, so that anyone reading the metric sees where the threshold came
+# from without opening a binary file. Both copies are asserted to agree in tests/test_verify.py.
 _REFERENCE_CASES: tuple[tuple[str, str, str, float], ...] = (
     ("q_00.png", "q_01.png", "same", 0.028),
     ("q_00.png", "q_06.png", "same", 0.031),
@@ -46,8 +47,6 @@ _REFERENCE_CASES: tuple[tuple[str, str, str, float], ...] = (
     ("w_baseline.png", "w_5_tilt-30.png", "changed", 0.624),
     ("w_baseline.png", "w_6_zoom1200.png", "changed", 1.616),
     ("s_0.png", "s_0b.png", "changed", 1.205),
-    ("aim_00_start.png", "aim_02_pan215.png", "changed", 1.157),
-    ("aim_00_start.png", "aim_03_pan150.png", "changed", 1.034),
 )
 
 

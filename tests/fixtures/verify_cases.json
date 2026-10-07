@@ -1,0 +1,82 @@
+{
+  "source": "frames captured from a DJI Osmo Pocket 4P on 2026-09-26 via its UVC controls",
+  "device": "DJI Osmo Pocket 4P (webcam mode), VID 0x2CA3 / PID 0x0023, since returned",
+  "metric": "z-normalised mean absolute difference of 320px-wide greyscale frames",
+  "labels": "assigned from what was observed at capture time, never from the metric",
+  "frames_file": "frames.npz (one 8-bit greyscale array per name below)",
+  "suggested_threshold": 0.364,
+  "highest_same": 0.1038,
+  "lowest_changed": 0.6242,
+  "cases": [
+    {
+      "first": "q_00.png",
+      "second": "q_01.png",
+      "label": "same",
+      "note": "quiet baseline, consecutive",
+      "value": 0.0283
+    },
+    {
+      "first": "q_00.png",
+      "second": "q_06.png",
+      "label": "same",
+      "note": "quiet baseline, 48s apart",
+      "value": 0.0313
+    },
+    {
+      "first": "q_00.png",
+      "second": "q_11.png",
+      "label": "same",
+      "note": "quiet baseline, whole 96s run",
+      "value": 0.032
+    },
+    {
+      "first": "s_0.png",
+      "second": "s_60.png",
+      "label": "same",
+      "note": "Pan 0 vs Pan 60 commanded: the 60 write did not apply",
+      "value": 0.0337
+    },
+    {
+      "first": "v2_0_0.png",
+      "second": "v2_1_60.png",
+      "label": "same",
+      "note": "Pan 0 vs 60, double-sent, 10s hold: no movement",
+      "value": 0.1038
+    },
+    {
+      "first": "v2_0_0.png",
+      "second": "v2_2_0.png",
+      "label": "same",
+      "note": "Pan 0 vs 0 at the end of that run",
+      "value": 0.0866
+    },
+    {
+      "first": "w_baseline.png",
+      "second": "w_2_pan-38.png",
+      "label": "changed",
+      "note": "observe_run: Pan -> -38",
+      "value": 0.9693
+    },
+    {
+      "first": "w_baseline.png",
+      "second": "w_5_tilt-30.png",
+      "label": "changed",
+      "note": "observe_run: Tilt -> -30",
+      "value": 0.6242
+    },
+    {
+      "first": "w_baseline.png",
+      "second": "w_6_zoom1200.png",
+      "label": "changed",
+      "note": "observe_run: Zoom -> 12x",
+      "value": 1.6164
+    },
+    {
+      "first": "s_0.png",
+      "second": "s_0b.png",
+      "label": "changed",
+      "note": "the one unexplained view change in that run",
+      "value": 1.2051
+    }
+  ]
+}
