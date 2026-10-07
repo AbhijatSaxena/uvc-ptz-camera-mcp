@@ -32,9 +32,13 @@ EXPECTED_TOOLS = {
     "aim_learn",
     "aim_list",
     "go_to",
+    "plan_shot",
     "run_shot",
     "mark_view",
     "check_view",
+    "track_start",
+    "track_status",
+    "track_stop",
 }
 
 

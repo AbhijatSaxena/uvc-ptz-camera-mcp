@@ -3,7 +3,7 @@
   "name": "io.github.AbhijatSaxena/uvc-ptz-camera-mcp",
   "title": "UVC PTZ Camera",
   "description": "Control a USB (UVC) pan/tilt/zoom camera, with every move confirmed from the picture.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "websiteUrl": "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp",
   "repository": {
     "url": "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "pypi",
       "identifier": "uvc-ptz-camera-mcp",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

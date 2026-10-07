@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "uvc-ptz-camera-mcp"
-version = "0.1.1"
+version = "0.2.0"
 description = "MCP server for USB (UVC) pan/tilt/zoom cameras: aim, zoom, sweep and capture, with every move verified against the picture."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,6 +46,10 @@ dependencies = [
 # The Windows DirectShow control path. Kept optional so the package installs and the
 # simulator/testing path runs anywhere.
 dshow = ["comtypes>=1.4", "pygrabber>=0.2"]
+# Following a subject. OpenCV ships the face cascade inside the wheel, so this needs no model
+# download and no network at first use; without it, `track_start` says exactly what to install
+# rather than failing obscurely.
+tracking = ["opencv-python-headless>=4.8"]
 
 [project.urls]
 Homepage = "https://github.com/AbhijatSaxena/uvc-ptz-camera-mcp"

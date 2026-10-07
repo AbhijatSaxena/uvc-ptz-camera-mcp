@@ -24,6 +24,7 @@ import asyncio
 import contextlib
 import logging
 import sys
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -37,6 +38,14 @@ from .calibration import Calibration, load_calibration, save_calibration
 from .camera import Axis, AxisSpec, parse_axis
 from .frames import png_bytes
 from .motion import compile_shot
+from .tracking import (
+    DEFAULT_DEAD_ZONE_PX,
+    DEFAULT_GAIN_DEG_PER_PX,
+    DEFAULT_MAX_STEP_DEGREES,
+    FaceDetector,
+    Tracker,
+    run_loop,
+)
 from .verify import compare
 
 _LOGGER = logging.getLogger("uvc_ptz_mcp")
@@ -54,6 +63,18 @@ class Session:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     marks: dict[str, np.ndarray] = field(default_factory=dict)
     start_error: str | None = None
+    # A follow loop, if one is running. Kept on the session so the tools that start, inspect and
+    # stop it all see the same one, and so it can be cancelled when the server goes away.
+    tracker: Any = None
+    track_task: asyncio.Task | None = None
+
+    def cancel_tracking(self) -> None:
+        """Stop a running follow loop, if there is one. Safe to call when there is not."""
+        if self.tracker is not None:
+            self.tracker.running = False
+        if self.track_task is not None and not self.track_task.done():
+            self.track_task.cancel()
+        self.track_task = None
 
     @property
     def threshold(self) -> float:
@@ -256,6 +277,39 @@ async def _apply_shot(session: Session, raw_steps: list[dict]) -> dict:
             "moved_from_start": compare(before, previous_frame, session.threshold).to_dict(),
             "simulated": bool(session.backend.describe().get("simulated")),
         }
+
+
+def _tracking_move(session: Session) -> Callable[[float, float], Awaitable[dict]]:
+    """Build the move the follow loop uses: a bounded, picture-verified pan/tilt nudge.
+
+    Each axis is applied on its own so each one is confirmed by the picture, which is the only
+    confirmation available: the loop's whole premise is that the device's report says nothing
+    useful. An axis already at the end of its travel reports no movement rather than pretending.
+    """
+
+    async def move(pan_degrees: float, tilt_degrees: float) -> dict:
+        reports: dict[str, dict] = {}
+        for axis, step in ((Axis.PAN, pan_degrees), (Axis.TILT, tilt_degrees)):
+            spec = session.specs.get(axis)
+            if spec is None or not step:
+                continue
+            reported = await session.reported(axis)
+            base = spec.default if reported is None else int(reported)
+            target = spec.clamp(base + step)
+            if target == base:
+                reports[axis.value] = {
+                    "moved": False,
+                    "detail": "already at the end of its travel",
+                }
+                continue
+            reports[axis.value] = await _apply_axis(session, axis, target)
+        return {
+            "moved": any(bool(report.get("moved")) for report in reports.values()),
+            "confirmed_by": "picture" if reports else None,
+            "axes": reports,
+        }
+
+    return move
 
 
 def build_server(session: Session) -> MCPServer:  # noqa: C901, PLR0915
@@ -545,6 +599,105 @@ def build_server(session: Session) -> MCPServer:  # noqa: C901, PLR0915
         return await _apply_shot(session, steps)
 
     @server.tool()
+    async def track_start(
+        target: str = "face",
+        gain: float = DEFAULT_GAIN_DEG_PER_PX,
+        dead_zone_px: int = DEFAULT_DEAD_ZONE_PX,
+        invert: bool = False,
+        max_seconds: float = 120.0,
+    ) -> dict:
+        """Start following a subject, closing the loop on the picture.
+
+        While this runs the server keeps capturing frames and moving the camera to hold the subject
+        near the centre of the frame: detect, measure the offset, take a bounded step, look again.
+        It decides only from the picture, because this class of camera's position report cannot be
+        trusted -- and it reports the residual offset every iteration, so a loop that is losing the
+        subject looks like one instead of seeming to work.
+
+        It looks at whatever the camera sees for as long as it runs, which may be a room with people
+        in it. Start it when the user wants the camera following something, and stop it when they do
+        not. It also stops by itself: when the subject is lost for a while, when it settles inside
+        the dead zone, or after `max_seconds`.
+
+        `gain` is degrees of camera movement per pixel of offset -- a starting point, not a
+        measurement. `invert` flips the direction, which is what a differently mounted camera needs:
+        if the camera drives *away* from the subject, the sign is wrong for this mount, so read
+        `track_status` and start again with invert true. Movement is capped at 25 degrees per
+        iteration, so a badly wrong gain converges slowly rather than throwing the camera across
+        its range.
+        """
+        if session.track_task is not None and not session.track_task.done():
+            raise ToolError("a follow loop is already running; stop it with track_stop first")
+        wanted = target.strip().lower()
+        if wanted != "face":
+            raise ToolError(f"unknown target {target!r}; this build can follow 'face'")
+        if not session.specs:
+            raise ToolError("no camera axes are available, so nothing can be followed")
+
+        try:
+            detector = FaceDetector()
+        except RuntimeError as error:
+            raise ToolError(str(error)) from None
+
+        tracker = Tracker(
+            target=wanted,
+            gain=gain,
+            dead_zone_px=dead_zone_px,
+            max_step=DEFAULT_MAX_STEP_DEGREES,
+            invert=invert,
+            max_seconds=max_seconds,
+        )
+        session.tracker = tracker
+        session.track_task = asyncio.create_task(
+            run_loop(
+                tracker,
+                detector=detector,
+                capture=session.frame,
+                move=_tracking_move(session),
+                sleep=asyncio.sleep,
+            )
+        )
+        return {
+            "started": True,
+            "moved": None,
+            "note": (
+                "the camera is being looked through and moved while this runs; "
+                "call track_status to watch it and track_stop to end it"
+            ),
+            "tracker": tracker.to_dict(),
+        }
+
+    @server.tool()
+    async def track_status() -> dict:
+        """Report what the follow loop is doing, with the evidence for each iteration.
+
+        Every iteration appears with the measured offset and the step applied, so a loop that is
+        driving the wrong way shows up as a residual distance that grows, and one whose moves the
+        picture never confirms shows up in `move_failures` rather than as apparent success.
+        """
+        if session.tracker is None:
+            return {"running": False, "note": "no follow loop has been started on this session"}
+        return session.tracker.to_dict()
+
+    @server.tool()
+    async def track_stop() -> dict:
+        """Stop following, and return the summary: what it saw, what it moved, what failed."""
+        if session.tracker is None:
+            raise ToolError("no follow loop has been started on this session")
+        tracker = session.tracker
+        tracker.running = False
+        task = session.track_task
+        if task is not None and not task.done():
+            with contextlib.suppress(asyncio.TimeoutError, asyncio.CancelledError):
+                # Let the current iteration finish so the summary includes it, but do not wait
+                # forever for a camera call that has stopped answering.
+                await asyncio.wait_for(asyncio.shield(task), timeout=10.0)
+            if not task.done():
+                task.cancel()
+        session.track_task = None
+        return {"stopped": True, "tracker": tracker.to_dict()}
+
+    @server.tool()
     async def mark_view(label: str) -> dict:
         """Store the current picture under a label, so it can be compared later.
 
@@ -630,5 +783,7 @@ def main_server(backend_kind: str = "auto", device: str | None = None) -> None:
     try:
         server.run()
     finally:
+        # A follow loop still running when the server goes away must not keep touching the camera.
+        session.cancel_tracking()
         with contextlib.suppress(Exception):
             session.backend.close()

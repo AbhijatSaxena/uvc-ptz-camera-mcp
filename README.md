@@ -26,12 +26,35 @@ plan_shot           compile a multi-step shot and report what it would do, movin
 run_shot            execute a multi-step move, verified after every waypoint
 mark_view           store the current picture under a label
 check_view          has the picture changed since that label?
+track_start         follow a subject: detect, measure, take a step, look again
+track_status        what the follow loop is doing, iteration by iteration
+track_stop          stop following and report what it saw and what it moved
 ```
 
 Composing a shot is `plan_shot` then `run_shot`. Planning compiles exactly the steps the executor
 will compile, reports the per-step schedule, how far each axis travels and how long it takes, and
 touches nothing — so an agent can iterate on "a panorama, then zoom in on me" against the camera's
 real ranges *before* anything moves, instead of finding out afterwards.
+
+### Following
+
+`track_start` runs a loop that keeps the camera pointed at a subject: detect it, measure how far it
+is from the centre of the frame, take a bounded step, look again. It decides only from the picture,
+for the same reason every other move here does — this camera's own report of where it is pointing
+cannot be trusted. It stops on its own when the subject is lost, when it settles inside the dead
+zone, when the camera stops answering, or after `max_seconds`, and `track_status` lists every
+iteration with the offset it measured and the step it applied.
+
+Two quantities are *mount*-dependent rather than device-dependent, so they are explicit parameters
+instead of clever guesses: `gain`, degrees of movement per pixel of offset, and `invert`, which
+flips the direction. A wrong choice shows up honestly as a residual error that grows, and a single
+iteration is capped at 25 degrees, so a wrong gain converges slowly rather than throwing the camera
+across its whole range in one command.
+
+Detection uses OpenCV's bundled face cascade (`pip install 'uvc-ptz-camera-mcp[tracking]'`), which
+needs no model download, no account and no network at first use. It finds faces: this follows a
+person, not a car or a dog. The loop and its arithmetic are tested against the simulator, but no
+part of follow mode has ever run against real hardware — treat it as the least proven thing here.
 
 ## Why this exists
 

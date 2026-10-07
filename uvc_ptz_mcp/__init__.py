@@ -23,4 +23,4 @@ __all__ = ["__version__"]
 
 # Keep this in step with pyproject.toml, server.json and the mcpb manifest: a host that asks
 # reports this value, and nothing reads it during packaging, so it drifts silently.
-__version__ = "0.1.1"
+__version__ = "0.2.0"
