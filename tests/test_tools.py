@@ -285,6 +285,7 @@ class BlindSimulator(SimulatorBackend):
     """
 
     def frame(self):
+        """Fail the way a real camera does on a machine with no ffmpeg."""
         raise RuntimeError("ffmpeg is required to capture frames from a real camera")
 
 
@@ -298,4 +299,3 @@ async def test_a_camera_that_cannot_be_read_is_a_tool_error_not_a_crash(monkeypa
     message = str(raised.value)
     assert "cannot read a frame" in message, "the tool must name what failed"
     assert "ffmpeg" in message, "and the underlying reason must survive"
-
