@@ -18,10 +18,11 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+NOT_FOUND = 404
 
 
-def project_name() -> str:
-    """The distribution name, from packagine metadata."""
+def project_name() -> tuple[str, str]:
+    """Read the distribution name and version from package metadata."""
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     name = re.search(r'^name = "([^"]+)"', text, re.M)
     version = re.search(r'^version = "([^"]+)"', text, re.M)
@@ -38,7 +39,7 @@ def is_published(name: str, version: str) -> bool:
         with urllib.request.urlopen(url, timeout=60) as response:
             body = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as error:
-        if error.code == 404:
+        if error.code == NOT_FOUND:
             return False
         raise
     marker = f"{normalised}-{version}-"
