@@ -1,7 +1,15 @@
 name: publish
 
-# Released by pushing a tag: no repository secret is needed, because PyPI trusted publishing and
-# the MCP registry's github-oidc login both accept an OIDC token from a tagged job.
+# Released by pushing a tag, in this order: build here, upload the built artifacts to PyPI from the
+# maintainer's machine, then tag. Uploading is deliberately *not* a CI step, so the API token stays
+# in the maintainer's credential store instead of being copied into a repository secret -- the same
+# design as blink-camera-mcp, so both projects release the same way.
+#
+# An earlier version of this file uploaded from CI through PyPI's trusted publishing. That path needs
+# a publisher configured on PyPI's side, and with none configured a tag failed with
+# `invalid-publisher: valid token, but no corresponding publisher` -- after a green build, so it read
+# as an auth fault rather than as missing setup. Verifying instead of uploading turns the mistake
+# people actually make (tagging before uploading) into a message naming the command to run.
 #
 # workflow_dispatch exists so a release can be re-run *without* rewriting the tag: a manifest fix
 # (the registry enforces a description length, and it is the registry that says so, not any local
@@ -29,34 +37,26 @@ jobs:
           name: dist
           path: dist/
 
-  pypi:
+  verify-pypi:
+    # Not an upload: proof that the version is already on PyPI. The registry proves ownership by
+    # finding the mcp-name marker in the package's *published* description, so telling the registry
+    # about a version PyPI has never seen cannot work -- and what it reports then is an ownership
+    # failure, which is the wrong thing to go debugging.
+    #
+    # The artifacts this run built are what get uploaded, so the bytes on PyPI are the bytes that
+    # passed the wheel check here: download the 'dist' artifact, then `uv publish dist/*`.
     needs: build
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write          # trusted publishing: no token stored anywhere
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - id: published
-        name: is this version already on PyPI?
-        run: |
-          if python scripts/on_pypi.py; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.published.outputs.skip == 'false'
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: the version must already be on PyPI
+        run: python scripts/on_pypi.py --require
 
   registry:
-    needs: pypi
+    needs: verify-pypi
     runs-on: ubuntu-latest
     permissions:
       id-token: write
